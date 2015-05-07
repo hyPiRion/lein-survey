@@ -43,7 +43,7 @@
     [:div.span10
      [:p (str "Do you use Leiningen? We'd love it if you could take a few"
               " minutes to answer some questions.")]]]
-   [:div.row
+   #_[:div.row
        [:div.span10
         [:p "The survey results are "
          [:a {:href "/results"} "available"]
@@ -58,7 +58,7 @@
   (html5
    [:head
     [:meta {:charset "utf-8"}]
-    [:title "Leiningen Survey: 2014"]
+    [:title "Leiningen Survey: 2015"]
     (include-css "bootstrap.min.css"
                  "lein-survey.css"
                  "http://fonts.googleapis.com/css?family=Electrolize")]
