@@ -39,11 +39,11 @@
 
 (defn questions-form [questions]
   [:div
-   #_[:div.row
+   [:div.row
     [:div.span10
      [:p (str "Do you use Leiningen? We'd love it if you could take a few"
               " minutes to answer some questions.")]]]
-   #_[:div.row
+   [:div.row
        [:div.span10
         [:p "The survey results are "
          [:a {:href "/results"} "available"]
@@ -66,7 +66,7 @@
     [:div.container
      [:div.content
       [:div.page-header
-       [:h1 "Leiningen Survey: 2014"]]
+       [:h1 "Leiningen Survey: 2015"]]
 
       [:div.row
        [:div.offset1

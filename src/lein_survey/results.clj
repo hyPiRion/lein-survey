@@ -9,6 +9,22 @@
             [lein-survey.questions :as q])
   (:import (org.apache.commons.codec.digest DigestUtils)))
 
+(def cache (atom {}))
+
+(defn flush-cache! []
+  (reset! cache {}))
+
+(defn memoize-in
+  "Like memoize, but inside a specified atom instead. The atom can be
+  used for memoization of multiple functions."
+  [mem f]
+  (fn [& args]
+    (if-let [e (find @mem [f args])]
+      (val e)
+      (let [ret (apply f args)]
+        (swap! mem assoc [f args] ret)
+        ret))))
+
 (defn setize [x]
   (if (coll? x)
     (set x)
@@ -17,22 +33,26 @@
 (defn merge-results [{:keys [id body timestamp]}]
   (assoc (read-string body) :id id :timestamp (.getTime timestamp)))
 
-(defn results-str []
-  (sql/with-connection (or (System/getenv "DATABASE_URL")
-                           "postgres://localhost:5432/lein-survey")
-    (sql/with-query-results results ["select * from answers"]
-      (pr-str (map merge-results results)))))
+(def results-str
+  (memoize-in
+   cache
+   (fn []
+     (sql/with-connection (or (System/getenv "DATABASE_URL")
+                              "postgres://localhost:5432/lein-survey")
+       (sql/with-query-results results ["select * from answers"]
+         (pr-str (map merge-results results)))))))
 
 (def results-url (java.net.URL. "http://lein-survey-2014.herokuapp.com/results.clj"))
 
 (defonce get-results
-  (memoize (fn [] (read-string (slurp results-url)))))
+  (memoize-in cache
+   (fn [] (read-string (results-str)))))
 
 (defn hash-question [q]
   (subs (DigestUtils/shaHex q) 10))
 
 (defn commentary [q]
-  (if-let [c (io/resource (str "commentary/2014/" (hash-question q)))]
+  #_(if-let [c (io/resource (str "commentary/2015/" (hash-question q)))]
     [:p (slurp c)]))
 
 (defn img-link [q]
@@ -82,11 +102,11 @@
 (defmethod summarize-question :textarea [results [q _ choices]]
   (if-let [s (io/resource (case q
                             "Other comments?"
-                            "commentary/2014/other.html"
+                            "commentary/2015/other.html"
                             "Favourite plugins? (comma-separated)"
-                            "commentary/2014/plugins.html"
+                            "commentary/2015/plugins.html"
                             "Favourite templates? (comma-separated)"
-                            "commentary/2014/templates.html"))]
+                            "commentary/2015/templates.html"))]
     [:div.answer (slurp s)]))
 
 (defmethod summarize-question :rank [results [q _ choices]]
@@ -108,17 +128,17 @@
   (let [results (get-results)]
     (into [:div.summary
            [:h3 "Data and commentary on the results"]
-           [:p "The survey ran from the 24th of March to the end of April. "
+           [:p ;; "The survey ran from the 24th of March to the end of April. "
             ;; "A final summary of commentary will be posted soon."
-            ;; " The survey is still open; commentary will be posted once it closes."
+            " The survey is still open; commentary will be posted once it closes."
             " Most questions allowed more than one answer, so percentages"
             " will not add up to 100."]
-           [:p [:a {:href "http://lein-survey-2013.herokuapp.com"}
+           [:p [:a {:href "http://lein-survey-2014.herokuapp.com"}
                 "Last year's survey results are still up."]]
            [:p "It may be interesting to compare some of these results "
-            "with Chas Emerick's "
-            [:a {:href "http://cemerick.com/2013/11/05/2013-state-of-clojure-clojurescript-survey/"}
-             "State of Clojure"] " survey from last summer."]
+            "with Cognitect's "
+            [:a {:href "http://blog.cognitect.com/blog/2014/10/20/results-of-2014-state-of-clojure-and-clojurescript-survey"}
+             "State of Clojure"] " survey from last November."]
            [:p "You can see "
             [:a {:href "https://github.com/technomancy/lein-survey"}
              "the source"] " for this survey on Github or get the "
@@ -176,9 +196,10 @@
            freqs (sort-by (comp str key) freqs)
            ;; TODO: make threshhold customizable?
            freqs (filter (fn [[x n]] (> n 3)) freqs)]
-       (charts/bar-chart (map str (keys freqs)) (vals freqs)
-                         :x-label "" :y-label ""
-                         :title q :vertical false))))
+       (if (seq freqs)
+         (charts/bar-chart (map str (keys freqs)) (vals freqs)
+                           :x-label "" :y-label ""
+                           :title q :vertical false)))))
 
 (defn get-ranks [result]
   (into {} (for [[q rank] result
@@ -222,19 +243,24 @@
                                  [(hash-question (first q)) q])))
 
 (def image-bytes
-  (memoize (fn [id]
-             (let [[q type] (hashed-questions
-                             id ["Your OS and package manager(s)" :os])
-                   out (java.io.ByteArrayOutputStream.)
-                   results (get-results)
-                   chart (chart q type results)]
-               (incanter/save chart out)
-               (.toByteArray out)))))
+  (memoize-in cache
+   (fn [id]
+     (let [[q type] (hashed-questions
+                     id ["Your OS and package manager(s)" :os])
+           out (java.io.ByteArrayOutputStream.)
+           results (get-results)
+           chart (chart q type results)]
+       (if chart
+         (incanter/save chart out)
+         (io/copy (clojure.java.io/input-stream (io/resource "not-enough-data.png")) out))
+       (.toByteArray out)))))
 
 (defn image [id]
   (java.io.ByteArrayInputStream. (image-bytes id)))
 
-(defn comments []
-  (string/join "\n----------------\n"
-               (for [body (get-results)]
-                 (get body "Other comments?"))))
+(def comments
+  (memoize-in
+   cache
+   (fn [] (string/join "\n----------------\n"
+                      (for [body (get-results)]
+                        (get body "Other comments?"))))))

@@ -22,6 +22,7 @@
   (sql/with-connection (or (System/getenv "DATABASE_URL")
                            "postgres://localhost:5432/lein-survey")
     (sql/insert-values :answers [:body] [(pr-str params)]))
+  (results/flush-cache!)
   (render/layout [:div
                   [:h1 "Thank you!"]
                   [:p "Check back in a few weeks to see the results."]]))
