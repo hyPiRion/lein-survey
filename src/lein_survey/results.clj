@@ -9,21 +9,22 @@
             [lein-survey.questions :as q])
   (:import (org.apache.commons.codec.digest DigestUtils)))
 
-(def cache (atom {}))
+(def cache (atom {:rev 0}))
 
 (defn flush-cache! []
-  (reset! cache {}))
+  (swap! cache (fn [c] {:rev ((fnil inc 0) (:rev c))})))
 
 (defn memoize-in
   "Like memoize, but inside a specified atom instead. The atom can be
   used for memoization of multiple functions."
   [mem f]
   (fn [& args]
-    (if-let [e (find @mem [f args])]
-      (val e)
-      (let [ret (apply f args)]
-        (swap! mem assoc [f args] ret)
-        ret))))
+    (let [rev (:rev @mem)]
+      (if-let [e (find @mem [f rev args])]
+        (val e)
+        (let [ret (apply f args)]
+          (swap! mem assoc [f rev args] ret)
+          ret)))))
 
 (defn setize [x]
   (if (coll? x)
