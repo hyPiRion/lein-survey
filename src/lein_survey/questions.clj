@@ -1,7 +1,8 @@
 (ns lein-survey.questions)
 
 (def questions [["How long have you been using Clojure?" :radio
-                 ["Weeks" "Months" "1 year" "2 years" "3+ years"]]
+                 ["Weeks" "Months" "1 year" "2 years" "3 years" "4 years"
+                  "5+ years"]]
                 ["When did you start using Leiningen?" :radio
                  ["I don't remember"
                   "0.x (Nov 2009)"
@@ -22,7 +23,8 @@
                   "Windows installer"
                   "From git"]]
                 ["What JVM versions you use regularly?  (java -version)" :check
-                 ["1.6.0" "1.7.0" "1.8.0" "prereleases from source"]]
+                 ["1.6.0" "1.7.0" "1.8.0" "1.9.0 Early Access"
+                  "prereleases from source"]]
                 ["Which Leiningen features do you use?" :check
                  ["custom profiles"
                   "aliases"
